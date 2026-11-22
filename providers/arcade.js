@@ -30,11 +30,14 @@ async function search(terms) {
     return [];
   }
   const needles = terms.map(norm).filter((t) => t && t !== 'game' && t !== 'games');
-  if (!needles.length) return all;
-  return all.filter((g) => {
-    const title = norm(g.title);
-    return needles.some((n) => title.includes(n) || n.includes(title));
-  });
+  const ranked = needles.length
+    ? all.filter((g) => {
+        // Whole-word match, so "war" does not hit "Wonderland Awards".
+        const title = ' ' + norm(g.title) + ' ';
+        return needles.some((n) => title.includes(' ' + n + ' ') || title.includes(' ' + n));
+      })
+    : all;
+  return ranked.map((g, i) => ({ ...g, sourceRank: i }));
 }
 
 // The page carries a serialized JSON payload; walk it and collect lockup
@@ -133,4 +136,14 @@ function parseCount(value) {
   return Math.round(n * (m[2].toUpperCase() === 'K' ? 1000 : 1000000));
 }
 
-module.exports = { search };
+// App Store ids of every Arcade title (empty set if the page is unreachable).
+async function arcadeIds() {
+  try {
+    const all = await catalogue();
+    return new Set(all.map((g) => (g.platforms[0].url.match(/id(\d+)/) || [])[1]).filter(Boolean));
+  } catch {
+    return new Set();
+  }
+}
+
+module.exports = { search, arcadeIds };

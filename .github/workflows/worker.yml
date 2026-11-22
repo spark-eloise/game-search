@@ -1,0 +1,30 @@
+# Deploys the search API (worker/ + lib/ + providers/) to Cloudflare Workers.
+# Needs the repository secret CLOUDFLARE_API_TOKEN (a token made from the
+# "Edit Cloudflare Workers" template) and, if the token can reach several
+# accounts, CLOUDFLARE_ACCOUNT_ID. Without the token the job is skipped.
+name: Deploy API to Cloudflare Workers
+
+on:
+  push:
+    branches: [main]
+    paths: ['worker/**', 'lib/**', 'providers/**', 'taxonomy.json', 'wrangler.toml', '.github/workflows/worker.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip without Cloudflare token
+        if: env.HAS_TOKEN != 'true'
+        run: echo "::notice::CLOUDFLARE_API_TOKEN is not set; skipping the Worker deploy."
+      - uses: cloudflare/wrangler-action@v3
+        if: env.HAS_TOKEN == 'true'
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

@@ -1,0 +1,46 @@
+# Publishes the search page (public/ + taxonomy.json) to GitHub Pages.
+# The page calls the Cloudflare Worker for searches; set its URL in the
+# repository variable GAME_SEARCH_API (Settings > Secrets and variables >
+# Actions > Variables), e.g. https://game-search-api.<you>.workers.dev
+name: Deploy page to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ['public/**', 'taxonomy.json', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build site
+        env:
+          GAME_SEARCH_API: ${{ vars.GAME_SEARCH_API }}
+        run: |
+          mkdir _site
+          cp -r public/. _site/
+          cp taxonomy.json _site/
+          if [ -z "$GAME_SEARCH_API" ]; then
+            echo "::warning::Repository variable GAME_SEARCH_API is not set; the page will have no search API."
+          fi
+          node -e 'require("fs").writeFileSync("_site/config.js", "window.GAME_SEARCH_API = " + JSON.stringify(process.env.GAME_SEARCH_API || "") + ";\n")'
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
