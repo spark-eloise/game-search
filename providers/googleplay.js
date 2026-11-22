@@ -20,19 +20,20 @@ async function search(terms) {
     } catch {
       continue;
     }
-    for (const entry of parseResults(html)) {
-      if (seen.has(entry.pkg)) continue;
+    parseResults(html).forEach((entry, rank) => {
+      if (seen.has(entry.pkg)) return;
       seen.add(entry.pkg);
       games.push({
         title: entry.title,
         developer: entry.developer,
         image: entry.image,
         rating: entry.rating,
-        ratingCount: null,
+        ratingCount: entry.reviews,
         year: null,
         genres: [],
         players: null,
         source: 'Google Play',
+        sourceRank: rank,
         platforms: [
           {
             platform: 'android',
@@ -42,13 +43,17 @@ async function search(terms) {
           },
         ],
       });
-    }
+    });
   }
   return games;
 }
 
-// The search page embeds each result's package id in details links, with
-// the title and price in the surrounding markup. Extract per-result windows.
+// The search page renders two kinds of result cards:
+//  - a featured card: <a href="/store/apps/details?id=PKG" aria-label="TITLE">
+//    followed by <div class="vWM94c">TITLE</div><div class="LbQbAe">DEV</div>
+//  - regular cards: <span class="DdYX5">TITLE</span> then
+//    <span class="wMUdtb">DEV</span>
+// Each card's markup runs until the next details link with a different id.
 function parseResults(html) {
   const out = [];
   const idRe = /\/store\/apps\/details\?id=([a-zA-Z0-9._]+)/g;
@@ -61,39 +66,56 @@ function parseResults(html) {
   }
   for (let i = 0; i < positions.length; i++) {
     const start = positions[i].index;
-    const end = i + 1 < positions.length ? positions[i + 1].index : start + 4000;
-    const window = html.slice(start, Math.min(end, start + 4000));
+    const end = i + 1 < positions.length ? positions[i + 1].index : start + 6000;
+    const card = html.slice(start, Math.min(end, start + 6000));
 
-    // Title: first substantial span text in the window; developer: next one.
-    let title = null;
-    let developer = null;
-    const spanRe = /<span[^>]*>([^<]{2,90})<\/span>/g;
-    let s;
-    while ((s = spanRe.exec(window)) !== null) {
-      const text = s[1].trim();
-      if (!text || /^(Free|Install|Contains ads|In-app purchases|\$|★)/.test(text)) continue;
-      if (!title) { title = text; continue; }
-      developer = text;
-      break;
-    }
-    if (!title) continue;
+    const title =
+      pick(card, /<span class="DdYX5">([^<]+)<\/span>/) ||
+      pick(card, /<div class="vWM94c">([^<]+)<\/div>/) ||
+      pick(card, /aria-label="([^"]+)"/);
+    if (!title || /^Rated /.test(title)) continue;
+    const developer =
+      pick(card, /<span class="wMUdtb">([^<]+)<\/span>/) ||
+      pick(card, /<div class="LbQbAe">([^<]+)<\/div>/);
 
-    const priceMatch = window.match(/\$(\d+\.\d{2})/);
-    const price = priceMatch ? Number(priceMatch[1]) : null;
-    const ratingMatch = window.match(/(\d\.\d)\s*★|★\s*(\d\.\d)/);
-    const imgMatch = window.match(/https:\/\/play-lh\.googleusercontent\.com\/[A-Za-z0-9_\-=]+/);
+    // Prices appear as a buy button label ("$6.99 Buy") or a standalone
+    // price element (">$3.99<"); a "$" inside description text is ignored.
+    const priceMatch = card.match(/(?:aria-label="|>)\$(\d+(?:\.\d{2})?)\b/);
+    const reviewsMatch = card.match(/>([\d.]+)([KMB]?) reviews</);
+    const ratingMatch = card.match(/Rated (\d(?:\.\d)?) stars/);
+    const imgMatch =
+      card.match(/(https:\/\/play-lh\.googleusercontent\.com\/[A-Za-z0-9_\-]+)=s\d+[^"]*"[^>]*alt="(?:Thumbnail|Icon) image"/) ||
+      card.match(/(https:\/\/play-lh\.googleusercontent\.com\/[A-Za-z0-9_\-]+)=s\d+/);
 
     out.push({
       pkg: positions[i].pkg,
       title,
       developer,
-      image: imgMatch ? imgMatch[0] : null,
-      rating: ratingMatch ? Number(ratingMatch[1] || ratingMatch[2]) : null,
-      price,
+      image: imgMatch ? `${imgMatch[1]}=s256` : null,
+      rating: ratingMatch ? Number(ratingMatch[1]) : null,
+      reviews: reviewsMatch
+        ? Math.round(Number(reviewsMatch[1]) * ({ K: 1e3, M: 1e6, B: 1e9 }[reviewsMatch[2]] || 1))
+        : null,
+      // A listed price means paid; no price on a card means free to install.
+      price: priceMatch ? Number(priceMatch[1]) : 0,
     });
     if (out.length >= 60) break;
   }
   return out;
+}
+
+function pick(text, re) {
+  const m = text.match(re);
+  return m ? decode(m[1].trim()) : null;
+}
+
+function decode(s) {
+  return s
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
 }
 
 module.exports = { search };

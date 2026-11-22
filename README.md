@@ -24,15 +24,17 @@ Then open http://localhost:4173 (set `PORT` to change the port).
 ## Sources
 
 Every search queries these sources live, merges and dedupes the results,
-and pages them 50 at a time (Load more). Merged results are kept in a
-short-lived in-memory cache (2 hours) per filter combination.
+ranks them, and pages them 50 at a time (Load more). Merged results are
+kept in a short-lived in-memory cache (2 hours) per filter combination;
+"Load more" pages through that cached result instead of re-querying. A
+search where a source failed is only cached for 2 minutes.
 
 | Source | Platforms | Access |
 | --- | --- | --- |
-| Apple iTunes Search API | iOS | Free (price 0) |
+| Apple iTunes Search API (Games genre only) | iOS | Free (price 0), or Apple Arcade when the id is in the Arcade catalogue |
 | Apple Arcade page (fetched at query time) | iOS | Apple Arcade |
-| Steam store search + app details | Windows, Mac | Free / Paid (live price) |
-| Roblox omni-search + games API | Roblox | Free |
+| Steam store search (Games category only: no DLC or soundtracks) + app details for the top hits | Windows, Mac | Free / Paid (live price) |
+| Roblox omni-search + games, votes and icons APIs | Roblox | Free |
 | Google Play search page (fetched at query time) | Android | Free / Paid (page price) |
 | RAWG (optional, needs key) | iOS, Android, Mac, Windows | — |
 | IGDB (optional, needs keys) | iOS, Android, Mac, Windows | — |
@@ -44,6 +46,28 @@ source contributes no results for that search; results are never fabricated.
 Access rules are enforced on the server: an iOS version is only ever Free or
 Apple Arcade, never Paid; Roblox is always Free; Paid applies only to
 Android, Mac and Windows. Access is shown per platform on each result.
+
+## Ranking
+
+With a keyword, each result gets a relevance score:
+
+- title match: exact title, title starting with the query, query as a
+  phrase, then each query word found in the title (prefix and one-typo
+  matches count for less);
+- developer, genre and store description matches add a little;
+- the store's own rank, rating count, live player count (Roblox) and being
+  found on several platforms add a popularity signal.
+
+Results with no textual match at all are dropped, except a store's own
+top few hits (stores also match on data we can't see). Companion apps
+(mods, maps, skins, guides, trackers, save editors…) are dropped unless the
+query asks for them. "Top rated" uses a weighted rating, so a 5.0 from a
+handful of ratings does not beat a 4.7 from a million.
+
+Genre filters match whole words against each store's genres (and the title
+or description), so "Action" no longer matches every "Action RPG" filter
+and vice versa. Sources without genre data (Google Play, Apple Arcade) are
+searched with the genre name itself when there is no keyword.
 
 ## Optional providers
 
