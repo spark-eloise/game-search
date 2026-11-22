@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game Search</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --white:#ffffff; --layer:#f4f4f4; --border:#e0e0e0;
+    --text:#161616; --secondary:#525252; --accent:#0f62fe; --accent-hover:#0043ce;
+    --success:#24a148;
+  }
+  *{box-sizing:border-box; border-radius:0;}
+  html,body{margin:0; padding:0;}
+  body{
+    font-family:"IBM Plex Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+    background:var(--layer); color:var(--text); font-weight:400;
+  }
+  button{font-family:inherit; cursor:pointer;}
+  button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible{
+    outline:2px solid var(--accent); outline-offset:1px;
+  }
+
+  /* ---------- header ---------- */
+  header{
+    height:48px; background:var(--text); color:var(--white);
+    display:flex; align-items:center; padding:0 16px; gap:16px;
+    position:sticky; top:0; z-index:30;
+  }
+  header .brand{font-weight:600; font-size:14px; letter-spacing:.01em; white-space:nowrap;}
+  header .brand span{font-weight:300;}
+
+  /* ---------- layout ---------- */
+  .layout{display:flex; align-items:flex-start; max-width:1440px; margin:0 auto;}
+  aside{
+    width:256px; flex:0 0 256px; background:var(--white);
+    border-right:1px solid var(--border);
+    position:sticky; top:48px; height:calc(100vh - 48px); overflow-y:auto;
+    padding:16px;
+  }
+  main{flex:1; min-width:0; padding:24px;}
+
+  /* ---------- filter bar (mobile) ---------- */
+  .filterbar{
+    display:none; position:sticky; top:48px; z-index:20;
+    background:var(--white); border-bottom:1px solid var(--border);
+    padding:8px 16px; align-items:center; gap:12px;
+  }
+  .filterbar .count{font-size:14px; color:var(--secondary);}
+
+  /* ---------- controls ---------- */
+  .group{margin-bottom:24px;}
+  .group > h3{
+    font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--secondary); margin:0 0 8px;
+  }
+  .field{margin-bottom:12px;}
+  .field label{display:block; font-size:12px; color:var(--secondary); margin-bottom:4px;}
+  input[type="search"], input[type="text"], select{
+    width:100%; height:40px; padding:0 12px; font-size:14px; font-family:inherit;
+    background:var(--layer); border:1px solid transparent; border-bottom:1px solid #8d8d8d;
+    color:var(--text);
+  }
+  input[type="search"]:focus, input[type="text"]:focus, select:focus{
+    outline:2px solid var(--accent); outline-offset:-2px; background:var(--white);
+  }
+  .check{
+    display:flex; align-items:center; gap:8px; min-height:32px;
+    font-size:14px; cursor:pointer; padding:2px 0;
+  }
+  .check input{width:16px; height:16px; accent-color:var(--text); flex:0 0 16px;}
+  .check .n{margin-left:auto; font-family:"IBM Plex Mono", monospace; font-size:12px; color:var(--secondary);}
+
+  /* ---------- genre accordions ---------- */
+  .accordion{border-top:1px solid var(--border);}
+  .accordion:last-child{border-bottom:1px solid var(--border);}
+  .acc-head{
+    width:100%; background:none; border:0; padding:0; min-height:40px;
+    display:flex; align-items:center; gap:8px; font-size:14px; text-align:left; color:var(--text);
+  }
+  .acc-head .chev{margin-left:auto; color:var(--secondary); font-size:12px; transition:transform .15s;}
+  .accordion.open .acc-head .chev{transform:rotate(180deg);}
+  .acc-head .n{font-family:"IBM Plex Mono", monospace; font-size:12px; color:var(--accent);}
+  .acc-body{display:none; padding:0 0 8px 8px;}
+  .accordion.open .acc-body{display:block;}
+
+  /* ---------- buttons ---------- */
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    min-height:40px; padding:0 16px; font-size:14px; border:1px solid var(--text);
+    background:var(--white); color:var(--text);
+  }
+  .btn:hover{background:var(--layer);}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:var(--white);}
+  .btn.primary:hover{background:var(--accent-hover);}
+  .btn.ghost{border-color:transparent; color:var(--accent); background:none;}
+  .btn.ghost:hover{background:var(--layer);}
+  .btn:disabled{opacity:.5; cursor:default;}
+
+  /* ---------- results ---------- */
+  .results-head{
+    display:flex; align-items:baseline; gap:16px; margin-bottom:8px; flex-wrap:wrap;
+  }
+  .results-head h2{font-size:20px; font-weight:400; margin:0;}
+  .results-head .count{font-family:"IBM Plex Mono", monospace; font-size:14px; color:var(--secondary);}
+  .tagsrow{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:16px;}
+  .tagsrow:empty{display:none;}
+  .tag{
+    display:inline-flex; align-items:center; gap:6px; border-radius:999px;
+    background:var(--layer); border:1px solid var(--border);
+    padding:2px 10px; font-size:12px; line-height:20px; white-space:nowrap;
+  }
+  .tag button{border:0; background:none; padding:0; font-size:12px; color:var(--secondary); line-height:1;}
+  .tag.access-free{background:#defbe6; border-color:#a7f0ba;}
+  .tag.access-arcade{background:#e8daff; border-color:#d4bbff;}
+  .tag.access-paid{background:#fff1f1; border-color:#ffb3b8;}
+
+  .result{
+    display:flex; gap:16px; background:var(--white); border-top:1px solid var(--border);
+    padding:16px; align-items:flex-start;
+  }
+  .result:last-of-type{border-bottom:1px solid var(--border);}
+  .result img, .result .noimg{
+    width:64px; height:64px; flex:0 0 64px; object-fit:cover; background:var(--layer);
+  }
+  .result .noimg{
+    display:flex; align-items:center; justify-content:center;
+    font-family:"IBM Plex Mono", monospace; font-size:20px; color:var(--secondary);
+  }
+  .result .body{flex:1; min-width:0;}
+  .result .title{font-size:16px; font-weight:600; margin:0 0 2px;}
+  .result .title a{color:var(--text); text-decoration:none;}
+  .result .title a:hover{color:var(--accent); text-decoration:underline;}
+  .result .dev{font-size:14px; color:var(--secondary); margin:0 0 8px;}
+  .result .ptags{display:flex; flex-wrap:wrap; gap:8px;}
+  .result .meta{
+    font-family:"IBM Plex Mono", monospace; font-size:14px; color:var(--secondary);
+    text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; line-height:1.7;
+  }
+  .result .meta .rating{color:var(--text);}
+
+  .empty{
+    background:var(--white); border-top:1px solid var(--border);
+    padding:48px 24px; text-align:center;
+  }
+  .empty h3{font-weight:400; font-size:20px; margin:0 0 16px;}
+  .loading{padding:32px 0; text-align:center; color:var(--secondary); font-size:14px;}
+  .loadmore{display:flex; justify-content:center; padding:24px 0;}
+
+  @media (max-width: 768px){
+    .filterbar{display:flex;}
+    .layout{flex-direction:column;}
+    aside{
+      display:none; width:100%; flex:none; position:static; height:auto;
+      border-right:0; border-bottom:1px solid var(--border);
+    }
+    aside.open{display:block;}
+    main{padding:16px; width:100%;}
+    .check{min-height:44px;}
+    .result .meta{font-size:12px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">Game <span>Search</span></div>
+</header>
+
+<div class="filterbar">
+  <button class="btn" id="filtersToggle" aria-expanded="false" aria-controls="filters">Filters</button>
+  <span class="count" id="filterCount"></span>
+  <button class="btn ghost" id="clearAllBar" style="margin-left:auto;">Clear all</button>
+</div>
+
+<div class="layout">
+  <aside id="filters">
+    <div class="group">
+      <div class="field">
+        <label for="q">Search games</label>
+        <input type="search" id="q" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>Platform</h3>
+      <div id="platforms"></div>
+    </div>
+
+    <div class="group">
+      <h3>Access</h3>
+      <div id="access"></div>
+    </div>
+
+    <div class="group">
+      <h3>Genres</h3>
+      <div class="field">
+        <label for="genreSearch">Search genres</label>
+        <input type="search" id="genreSearch" autocomplete="off">
+      </div>
+      <div id="genreList"></div>
+    </div>
+
+    <div class="group">
+      <div class="field">
+        <label for="players">Players</label>
+        <select id="players">
+          <option value="any">Any</option>
+          <option value="single">Single player</option>
+          <option value="multi">Multiplayer</option>
+          <option value="coop">Co-op</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="sort">Sort</label>
+        <select id="sort">
+          <option value="relevance">Relevance</option>
+          <option value="rating">Top rated</option>
+          <option value="newest">Newest</option>
+          <option value="name">Name A–Z</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn" id="clearAll">Clear all</button>
+  </aside>
+
+  <main>
+    <div class="results-head">
+      <h2>Results</h2>
+      <span class="count" id="resultCount"></span>
+    </div>
+    <div class="tagsrow" id="tagsRow"></div>
+    <div id="results"></div>
+    <div class="loadmore" id="loadMoreWrap" style="display:none;">
+      <button class="btn primary" id="loadMore">Load more</button>
+    </div>
+  </main>
+</div>
+
+<script>
+const PLATFORMS = [
+  ['ios', 'iOS'], ['android', 'Android'], ['mac', 'Mac'],
+  ['windows', 'Windows'], ['roblox', 'Roblox'],
+];
+const ACCESS = [
+  ['free', 'Free'], ['paid', 'Paid'], ['arcade', 'Apple Arcade'],
+];
+const PLATFORM_LABEL = Object.fromEntries(PLATFORMS);
+const ACCESS_LABEL = { free: 'Free', paid: 'Paid', arcade: 'Apple Arcade' };
+
+const state = {
+  q: '', platforms: new Set(), access: new Set(),
+  genres: new Set(), players: 'any', sort: 'relevance',
+  page: 0, hasMore: false, loading: false, results: [],
+};
+let taxonomy = { genres: [] };
+
+const $ = (id) => document.getElementById(id);
+
+function checkbox(container, value, label, set, onChange) {
+  const row = document.createElement('label');
+  row.className = 'check';
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.value = value;
+  input.addEventListener('change', () => {
+    if (input.checked) set.add(value); else set.delete(value);
+    onChange();
+  });
+  const span = document.createElement('span');
+  span.textContent = label;
+  const count = document.createElement('span');
+  count.className = 'n';
+  count.dataset.countFor = value;
+  row.append(input, span, count);
+  container.append(row);
+  return input;
+}
+
+function buildFilters() {
+  for (const [value, label] of PLATFORMS) checkbox($('platforms'), value, label, state.platforms, refresh);
+  for (const [value, label] of ACCESS) checkbox($('access'), value, label, state.access, refresh);
+
+  const list = $('genreList');
+  for (const group of taxonomy.genres) {
+    const acc = document.createElement('div');
+    acc.className = 'accordion';
+    acc.dataset.group = group.name;
+
+    const head = document.createElement('button');
+    head.className = 'acc-head';
+    head.type = 'button';
+    head.setAttribute('aria-expanded', 'false');
+    const name = document.createElement('span');
+    name.textContent = group.name;
+    const n = document.createElement('span');
+    n.className = 'n';
+    n.dataset.groupCount = group.name;
+    const chev = document.createElement('span');
+    chev.className = 'chev';
+    chev.textContent = '▾';
+    head.append(name, n, chev);
+    head.addEventListener('click', () => {
+      acc.classList.toggle('open');
+      head.setAttribute('aria-expanded', acc.classList.contains('open') ? 'true' : 'false');
+    });
+
+    const body = document.createElement('div');
+    body.className = 'acc-body';
+    checkbox(body, group.name, group.name, state.genres, refresh)
+      .closest('.check').dataset.genreRow = group.name;
+    for (const sub of group.subgenres) {
+      checkbox(body, sub, sub, state.genres, refresh)
+        .closest('.check').dataset.genreRow = sub;
+    }
+    acc.append(head, body);
+    list.append(acc);
+  }
+}
+
+function selectedCount() {
+  return state.platforms.size + state.access.size + state.genres.size +
+    (state.q ? 1 : 0) + (state.players !== 'any' ? 1 : 0);
+}
+
+function renderTags() {
+  const row = $('tagsRow');
+  row.innerHTML = '';
+  const add = (label, clear) => {
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.textContent = label;
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.textContent = '✕';
+    x.setAttribute('aria-label', 'Remove ' + label);
+    x.addEventListener('click', clear);
+    tag.append(x);
+    row.append(tag);
+  };
+  for (const p of state.platforms) add(PLATFORM_LABEL[p], () => uncheck('platforms', p));
+  for (const a of state.access) add(ACCESS_LABEL[a], () => uncheck('access', a));
+  for (const g of state.genres) add(g, () => uncheckGenre(g));
+  $('filterCount').textContent = selectedCount() ? `(${selectedCount()})` : '';
+  document.querySelectorAll('[data-group-count]').forEach((el) => {
+    const group = taxonomy.genres.find((g) => g.name === el.dataset.groupCount);
+    if (!group) return;
+    const n = [group.name, ...group.subgenres].filter((s) => state.genres.has(s)).length;
+    el.textContent = n ? String(n) : '';
+  });
+}
+
+function uncheck(containerId, value) {
+  const input = $(containerId).querySelector(`input[value="${CSS.escape(value)}"]`);
+  if (input) { input.checked = false; input.dispatchEvent(new Event('change')); }
+}
+function uncheckGenre(value) {
+  const input = $('genreList').querySelector(`input[value="${CSS.escape(value)}"]`);
+  if (input) { input.checked = false; input.dispatchEvent(new Event('change')); }
+}
+
+function clearAll() {
+  document.querySelectorAll('#filters input[type="checkbox"]').forEach((i) => { i.checked = false; });
+  state.platforms.clear(); state.access.clear(); state.genres.clear();
+  state.q = ''; $('q').value = '';
+  state.players = 'any'; $('players').value = 'any';
+  state.sort = 'relevance'; $('sort').value = 'relevance';
+  refresh();
+}
+
+function queryString(page) {
+  const params = new URLSearchParams();
+  if (state.q) params.set('q', state.q);
+  if (state.platforms.size) params.set('platforms', [...state.platforms].join(','));
+  if (state.access.size) params.set('access', [...state.access].join(','));
+  if (state.genres.size) params.set('genres', [...state.genres].join(','));
+  if (state.players !== 'any') params.set('players', state.players);
+  if (state.sort !== 'relevance') params.set('sort', state.sort);
+  params.set('page', page);
+  return params.toString();
+}
+
+async function load(page) {
+  state.loading = true;
+  renderLoading();
+  try {
+    const res = await fetch('/api/search?' + queryString(page));
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    state.page = data.page;
+    state.hasMore = data.hasMore;
+    state.results = page === 0 ? data.results : state.results.concat(data.results);
+    state.total = data.total;
+    render();
+  } catch (err) {
+    renderError();
+  } finally {
+    state.loading = false;
+  }
+}
+
+function refresh() {
+  renderTags();
+  load(0);
+}
+
+function resultRow(game) {
+  const row = document.createElement('div');
+  row.className = 'result';
+  if (game.image) {
+    const img = document.createElement('img');
+    img.src = game.image;
+    img.alt = '';
+    img.loading = 'lazy';
+    img.onerror = () => img.replaceWith(noImg(game));
+    row.append(img);
+  } else {
+    row.append(noImg(game));
+  }
+  const body = document.createElement('div');
+  body.className = 'body';
+  const firstUrl = (game.platforms[0] && game.platforms[0].url) || '#';
+  const title = document.createElement('p');
+  title.className = 'title';
+  const a = document.createElement('a');
+  a.href = firstUrl;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.textContent = game.title;
+  title.append(a);
+  body.append(title);
+  if (game.developer) {
+    const dev = document.createElement('p');
+    dev.className = 'dev';
+    dev.textContent = game.developer;
+    body.append(dev);
+  }
+  const ptags = document.createElement('div');
+  ptags.className = 'ptags';
+  for (const entry of game.platforms) {
+    const tag = document.createElement('span');
+    tag.className = 'tag' + (entry.access ? ' access-' + entry.access : '');
+    let label = PLATFORM_LABEL[entry.platform] || entry.platform;
+    if (entry.access) label += ' · ' + ACCESS_LABEL[entry.access];
+    else if (entry.price) label += ' · $' + entry.price.toFixed(2);
+    tag.textContent = label;
+    ptags.append(tag);
+  }
+  for (const genre of (game.genres || []).slice(0, 3)) {
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.textContent = genre;
+    ptags.append(tag);
+  }
+  body.append(ptags);
+  row.append(body);
+
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  const lines = [];
+  if (game.rating) lines.push('<span class="rating">★ ' + game.rating.toFixed(1) + '</span>');
+  if (game.year) lines.push(String(game.year));
+  if (game.source) lines.push(game.source);
+  meta.innerHTML = lines.join('<br>');
+  row.append(meta);
+  return row;
+}
+
+function noImg(game) {
+  const div = document.createElement('div');
+  div.className = 'noimg';
+  div.textContent = (game.title || '?').trim().charAt(0).toUpperCase();
+  return div;
+}
+
+function renderLoading() {
+  if (state.page === 0 && !state.results.length) {
+    $('results').innerHTML = '<div class="loading">Loading…</div>';
+  }
+  $('loadMore').disabled = true;
+}
+
+function renderError() {
+  $('results').innerHTML = '';
+  const div = document.createElement('div');
+  div.className = 'empty';
+  const h = document.createElement('h3');
+  h.textContent = 'Search failed';
+  const btn = document.createElement('button');
+  btn.className = 'btn';
+  btn.textContent = 'Retry';
+  btn.addEventListener('click', () => load(state.page));
+  div.append(h, btn);
+  $('results').append(div);
+  $('resultCount').textContent = '';
+  $('loadMoreWrap').style.display = 'none';
+}
+
+function render() {
+  const wrap = $('results');
+  wrap.innerHTML = '';
+  $('resultCount').textContent = state.results.length
+    ? `${state.results.length} loaded`
+    : '';
+  if (!state.results.length) {
+    const div = document.createElement('div');
+    div.className = 'empty';
+    const h = document.createElement('h3');
+    h.textContent = 'No games match';
+    const btn = document.createElement('button');
+    btn.className = 'btn';
+    btn.textContent = 'Reset filters';
+    btn.addEventListener('click', clearAll);
+    div.append(h, btn);
+    wrap.append(div);
+  } else {
+    for (const game of state.results) wrap.append(resultRow(game));
+  }
+  $('loadMoreWrap').style.display = state.hasMore ? 'flex' : 'none';
+  $('loadMore').disabled = false;
+}
+
+// ---------- wiring ----------
+let debounce = null;
+$('q').addEventListener('input', () => {
+  clearTimeout(debounce);
+  debounce = setTimeout(() => { state.q = $('q').value.trim(); refresh(); }, 350);
+});
+$('players').addEventListener('change', () => { state.players = $('players').value; refresh(); });
+$('sort').addEventListener('change', () => { state.sort = $('sort').value; refresh(); });
+$('clearAll').addEventListener('click', clearAll);
+$('clearAllBar').addEventListener('click', clearAll);
+$('loadMore').addEventListener('click', () => load(state.page + 1));
+$('filtersToggle').addEventListener('click', () => {
+  const aside = $('filters');
+  aside.classList.toggle('open');
+  $('filtersToggle').setAttribute('aria-expanded', aside.classList.contains('open') ? 'true' : 'false');
+});
+$('genreSearch').addEventListener('input', () => {
+  const needle = $('genreSearch').value.trim().toLowerCase();
+  document.querySelectorAll('#genreList .accordion').forEach((acc) => {
+    let any = false;
+    acc.querySelectorAll('[data-genre-row]').forEach((row) => {
+      const show = !needle || row.dataset.genreRow.toLowerCase().includes(needle);
+      row.style.display = show ? '' : 'none';
+      if (show) any = true;
+    });
+    acc.style.display = any ? '' : 'none';
+    if (needle && any) acc.classList.add('open');
+    else if (!needle) acc.classList.remove('open');
+  });
+});
+
+fetch('/taxonomy.json')
+  .then((r) => r.json())
+  .then((data) => {
+    taxonomy = data;
+    buildFilters();
+    renderTags();
+    load(0);
+  })
+  .catch(() => { buildFilters(); load(0); });
+</script>
+</body>
+</html>
