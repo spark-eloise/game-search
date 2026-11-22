@@ -13,7 +13,7 @@
 
 const { fetchJSON, mapLimit } = require('./util');
 
-const DETAILS_LIMIT = 24;
+let DETAILS_LIMIT = 24;
 const detailsCache = new Map(); // appid -> { ts, data }
 const DETAILS_MS = 6 * 60 * 60 * 1000;
 
@@ -140,4 +140,9 @@ function decode(s) {
     .replace(/&gt;/g, '>');
 }
 
-module.exports = { search };
+// Fewer detail lookups where outbound requests are budgeted (Workers).
+function configure({ detailsLimit } = {}) {
+  if (Number.isInteger(detailsLimit) && detailsLimit >= 0) DETAILS_LIMIT = detailsLimit;
+}
+
+module.exports = { search, configure };

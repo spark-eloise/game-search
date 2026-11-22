@@ -1,0 +1,17 @@
+# Cloudflare Worker serving the Game Search API (see worker/index.mjs).
+# Deploy with: npx wrangler deploy
+name = "game-search-api"
+main = "worker/index.mjs"
+compatibility_date = "2025-09-01"
+# Providers use require('crypto') and process.env; nodejs_compat provides both
+# (process.env is filled from the vars and secrets below).
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Comma-separated origins allowed to call the API from a browser, or "*".
+ALLOWED_ORIGINS = "https://spark-eloise.github.io,http://localhost:4173"
+
+# Optional providers: set as secrets, never here.
+#   npx wrangler secret put RAWG_API_KEY
+#   npx wrangler secret put IGDB_CLIENT_ID
+#   npx wrangler secret put IGDB_CLIENT_SECRET

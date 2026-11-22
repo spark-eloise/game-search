@@ -69,6 +69,37 @@ or description), so "Action" no longer matches every "Action RPG" filter
 and vice versa. Sources without genre data (Google Play, Apple Arcade) are
 searched with the genre name itself when there is no keyword.
 
+## Publish on GitHub Pages
+
+GitHub Pages only serves static files, and the stores don't let a browser
+page read their search results directly. So the site is split in two:
+
+- **The page** (`public/` + `taxonomy.json`) goes on GitHub Pages, deployed
+  by `.github/workflows/pages.yml` on every push to `main`.
+- **The search API** (`worker/index.mjs`, sharing `lib/search.js` and
+  `providers/` with the Node server) runs on
+  [Cloudflare Workers](https://workers.cloudflare.com/) (free plan is enough).
+
+One-time setup:
+
+1. **Deploy the Worker.** Either run `npx wrangler login` then
+   `npx wrangler deploy` from the repo, or add a repository secret
+   `CLOUDFLARE_API_TOKEN` (a Cloudflare API token made from the
+   "Edit Cloudflare Workers" template; add `CLOUDFLARE_ACCOUNT_ID` too if
+   asked) and `.github/workflows/worker.yml` deploys it on every push to
+   `main`. Note the URL it prints, e.g.
+   `https://game-search-api.<your-subdomain>.workers.dev`.
+2. **Point the page at it.** In the repo's Settings → Secrets and
+   variables → Actions → Variables, add `GAME_SEARCH_API` with that URL.
+3. **Turn on Pages.** Settings → Pages → Source: **GitHub Actions**, then
+   re-run "Deploy page to GitHub Pages" (Actions tab). The site is at
+   `https://spark-eloise.github.io/game-search/`.
+
+The Worker only answers browsers from the origins in `ALLOWED_ORIGINS`
+(`wrangler.toml`). RAWG / IGDB keys go in with `npx wrangler secret put`.
+On the Worker, Steam detail lookups are capped at 12 per search to stay
+within the free plan's 50 outbound requests per call.
+
 ## Optional providers
 
 RAWG and IGDB activate only when their keys are present in the environment.

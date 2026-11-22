@@ -240,7 +240,12 @@
   </main>
 </div>
 
+<script src="config.js"></script>
 <script>
+// Where the search API lives. Empty = same origin (the Node server).
+// On GitHub Pages, config.js points this at the Cloudflare Worker.
+const API_BASE = String(window.GAME_SEARCH_API || '').replace(/\/+$/, '');
+
 const PLATFORMS = [
   ['ios', 'iOS'], ['android', 'Android'], ['mac', 'Mac'],
   ['windows', 'Windows'], ['roblox', 'Roblox'],
@@ -387,7 +392,7 @@ async function load(page) {
   state.loading = true;
   renderLoading();
   try {
-    const res = await fetch('/api/search?' + queryString(page));
+    const res = await fetch(API_BASE + '/api/search?' + queryString(page));
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     state.page = data.page;
@@ -554,7 +559,7 @@ $('genreSearch').addEventListener('input', () => {
   });
 });
 
-fetch('/taxonomy.json')
+fetch('taxonomy.json')
   .then((r) => r.json())
   .then((data) => {
     taxonomy = data;
